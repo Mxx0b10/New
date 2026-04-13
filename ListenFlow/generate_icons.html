@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ListenFlow — Generate Icons</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0e17;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+      margin: 0;
+    }
+    h1 { font-size: 1.5rem; color: #a78bfa; margin: 0; }
+    p  { color: #888; margin: 0; font-size: 0.9rem; text-align: center; }
+    .previews { display: flex; gap: 24px; align-items: flex-end; }
+    canvas { border-radius: 22%; box-shadow: 0 4px 20px rgba(124,58,237,0.5); }
+    button {
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 28px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { opacity: 0.9; }
+    .note {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 14px 20px;
+      font-size: 0.82rem;
+      color: #aaa;
+      max-width: 420px;
+      line-height: 1.6;
+    }
+    code { color: #a78bfa; background: rgba(167,139,250,0.12); padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🎧 ListenFlow Icon Generator</h1>
+  <p>Preview the icons, then click Download to save them.</p>
+
+  <div class="previews">
+    <div style="text-align:center">
+      <canvas id="c128" width="128" height="128"></canvas>
+      <p style="margin-top:6px">128×128</p>
+    </div>
+    <div style="text-align:center">
+      <canvas id="c48" width="48" height="48"></canvas>
+      <p style="margin-top:6px">48×48</p>
+    </div>
+    <div style="text-align:center">
+      <canvas id="c16" width="16" height="16"></canvas>
+      <p style="margin-top:6px">16×16</p>
+    </div>
+  </div>
+
+  <button onclick="downloadAll()">⬇ Download All Icons</button>
+
+  <div class="note">
+    After downloading, move the three PNG files into the<br>
+    <code>icons/</code> folder inside your <code>ListenFlow/</code> directory,<br>
+    then load the extension in Chrome via <strong>chrome://extensions</strong>.
+  </div>
+
+  <script>
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      const r = size / 2;
+
+      // Background gradient
+      const grad = ctx.createLinearGradient(0, 0, size, size);
+      grad.addColorStop(0, '#7c3aed');
+      grad.addColorStop(1, '#4f46e5');
+
+      // Rounded square background
+      const radius = size * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(radius, 0);
+      ctx.lineTo(size - radius, 0);
+      ctx.quadraticCurveTo(size, 0, size, radius);
+      ctx.lineTo(size, size - radius);
+      ctx.quadraticCurveTo(size, size, size - radius, size);
+      ctx.lineTo(radius, size);
+      ctx.quadraticCurveTo(0, size, 0, size - radius);
+      ctx.lineTo(0, radius);
+      ctx.quadraticCurveTo(0, 0, radius, 0);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Draw headphone emoji / simplified headphone shape
+      ctx.save();
+      ctx.translate(r, r);
+
+      const unit = size * 0.072;
+
+      if (size >= 48) {
+        // Headphone arc
+        ctx.beginPath();
+        ctx.arc(0, -unit * 0.5, unit * 3, Math.PI * 0.9, Math.PI * 0.1, false);
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+        ctx.lineWidth = unit * 1.2;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Left ear cup
+        ctx.beginPath();
+        ctx.ellipse(-unit * 3, unit * 1.8, unit * 1.1, unit * 1.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fill();
+
+        // Right ear cup
+        ctx.beginPath();
+        ctx.ellipse(unit * 3, unit * 1.8, unit * 1.1, unit * 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Small sizes: simple solid circle with H shape
+        ctx.beginPath();
+        ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // Render on load
+    [128, 48, 16].forEach(s => drawIcon(document.getElementById('c' + s), s));
+
+    function downloadAll() {
+      [128, 48, 16].forEach(s => {
+        const canvas = document.getElementById('c' + s);
+        const a = document.createElement('a');
+        a.download = `icon${s}.png`;
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      });
+    }
+  </script>
+</body>
+</html>

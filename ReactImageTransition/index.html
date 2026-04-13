@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Image Transition Demo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            color: white;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        #root {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 16px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 5;
+        }
+
+        .error-msg {
+            color: #ff4444;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ff4444;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui">
+        <h1 style="margin: 0 0 8px 0; font-size: 1.2rem; font-weight: 600;">WebGL Cinematic Burn</h1>
+        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;">Click anywhere to transition</p>
+    </div>
+
+    <div id="loading">Initializing WebGL Engine...</div>
+    <div id="root"></div>
+
+    <!-- Scripts from CDN -->
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        // Common variables
+        const { useState, useRef, useMemo, useEffect, Suspense } = React;
+
+        // Error Handler
+        const showError = (msg) => {
+            const root = document.getElementById('root');
+            root.innerHTML = `<div class="error-msg"><strong>Error:</strong> ${msg}</div>`;
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        window.onerror = (msg) => showError(msg);
+
+        // Shaders
+        const vertexShader = `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            uniform float uProgress;
+            uniform float uTime;
+            uniform sampler2D uTexture1;
+            uniform sampler2D uTexture2;
+            varying vec2 vUv;
+
+            // Simple Noise
+            float rand(vec2 n) { 
+                return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
+            }
+
+            float noise(vec2 p) {
+                vec2 ip = floor(p);
+                vec2 u = fract(p);
+                u = u*u*(3.0-2.0*u);
+                float res = mix(
+                    mix(rand(ip), rand(ip+vec2(1.0,0.0)), u.x),
+                    mix(rand(ip+vec2(0.0,1.0)), rand(ip+vec2(1.0,1.0)), u.x), u.y);
+                return res*res;
+            }
+
+            void main() {
+                vec2 uv = vUv;
+                float p = uProgress;
+                
+                // Noise based mask
+                float n = noise(uv * 5.0 + uTime * 0.1);
+                float mask = smoothstep(p - 0.1, p + 0.1, n + uv.x * 0.5);
+                
+                vec4 t1 = texture2D(uTexture1, uv);
+                vec4 t2 = texture2D(uTexture2, uv);
+                
+                float edge = smoothstep(p - 0.1, p, n + uv.x * 0.5) - smoothstep(p, p + 0.1, n + uv.x * 0.5);
+                vec4 burnColor = vec4(1.0, 0.3, 0.05, 1.0) * edge * 2.0;
+                
+                gl_FragColor = mix(t1, t2, p) + burnColor;
+                
+                // Proper mix based on mask
+                gl_FragColor = mix(t2, t1, mask) + burnColor;
+            }
+        `;
+
+        // Simplified Renderer Wrapper because @react-three/fiber can be tricky in UMD
+        const Scene = ({ images }) => {
+            const canvasRef = useRef();
+            const requestRef = useRef();
+
+            useEffect(() => {
+                // WebGL support check
+                if (!document.createElement('canvas').getContext('webgl')) {
+                    showError("Your browser does not support WebGL. Please update your browser or try a different one.");
+                    return;
+                }
+
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(width, height);
+                canvasRef.current.appendChild(renderer.domElement);
+
+                const loader = new THREE.TextureLoader();
+                const textures = images.map(url => {
+                    const t = loader.load(url, () => {
+                        document.getElementById('loading').style.display = 'none';
+                    }, undefined, (err) => showError("Failed to load image: " + url));
+                    t.colorSpace = THREE.SRGBColorSpace;
+                    return t;
+                });
+
+                const geometry = new THREE.PlaneGeometry(2, 2);
+                const uniforms = {
+                    uTime: { value: 0 },
+                    uProgress: { value: 0 },
+                    uTexture1: { value: textures[0] },
+                    uTexture2: { value: textures[1] }
+                };
+
+                const material = new THREE.ShaderMaterial({
+                    uniforms,
+                    vertexShader,
+                    fragmentShader
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+                scene.add(mesh);
+
+                let startTime = 0;
+                const animate = (time) => {
+                    uniforms.uTime.value = time * 0.001;
+
+                    if (window.isTransitioning) {
+                        if (startTime === 0) startTime = time;
+                        const elapsed = (time - startTime) / 1000;
+                        const p = Math.min(elapsed / 1.2, 1);
+                        uniforms.uProgress.value = p;
+
+                        if (p >= 1) {
+                            window.isTransitioning = false;
+                            startTime = 0;
+                            const current = window.nextIdx;
+                            const next = (current + 1) % images.length;
+                            window.currIdx = current;
+                            window.nextIdx = next;
+                            uniforms.uTexture1.value = textures[current];
+                            uniforms.uTexture2.value = textures[next];
+                            uniforms.uProgress.value = 0;
+                        }
+                    }
+
+                    renderer.render(scene, camera);
+                    requestRef.current = requestAnimationFrame(animate);
+                };
+
+                requestRef.current = requestAnimationFrame(animate);
+
+                const handleResize = () => {
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                };
+                window.addEventListener('resize', handleResize);
+
+                return () => {
+                    window.removeEventListener('resize', handleResize);
+                    cancelAnimationFrame(requestRef.current);
+                    renderer.dispose();
+                };
+            }, []);
+
+            return <div ref={canvasRef} onClick={() => window.isTransitioning = true} style={{ width: '100%', height: '100%' }} />;
+        };
+
+        window.currIdx = 0;
+        window.nextIdx = 1;
+        window.isTransitioning = false;
+
+        const App = () => {
+            const DEMO_IMAGES = [
+                'https://images.unsplash.com/photo-1534214526114-0ea4d47b04f2?auto=format&fit=crop&w=1920&q=80',
+                'https://images.unsplash.com/photo-1498429089284-41f8cf3ffd39?auto=format&fit=crop&w=1920&q=80',
+                'https://images.unsplash.com/photo-1542314831-c5a4d4071f40?auto=format&fit=crop&w=1920&q=80'
+            ];
+
+            return <Scene images={DEMO_IMAGES} />;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
