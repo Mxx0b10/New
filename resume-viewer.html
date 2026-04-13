@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Manish Patel — UX/UI Designer · 3D Resume</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{overflow:hidden;background:#1c2633;font-family:sans-serif}
+  #c{display:block;width:100vw;height:100vh}
+  #hint,#rdhint{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%);
+    color:rgba(255,255,255,.9);font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+    pointer-events:none;background:rgba(0,0,0,.5);padding:9px 22px;border-radius:20px;
+    transition:opacity .5s;white-space:nowrap;
+  }
+  #rdhint{opacity:0}
+  .btn{
+    position:fixed;z-index:20;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    border-radius:8px;padding:9px 16px;cursor:pointer;
+    background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.28);color:#fff;
+    transition:background .2s,opacity .35s;
+  }
+  .btn:hover{background:rgba(255,255,255,.26)}
+  #back{top:18px;left:18px;opacity:0;pointer-events:none}
+  #back.vis{opacity:1;pointer-events:all}
+  #fs{top:18px;right:18px}
+  #sbar{
+    position:fixed;right:14px;top:50%;transform:translateY(-50%);
+    width:3px;height:160px;background:rgba(255,255,255,.18);border-radius:2px;
+    opacity:0;transition:opacity .4s;
+  }
+  #sfill{width:100%;background:rgba(255,255,255,.75);border-radius:2px;height:0}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">Click the resume to read</div>
+<div id="rdhint">Scroll to read &nbsp;·&nbsp; Click outside to close</div>
+<button class="btn" id="back">← Put Down</button>
+<button class="btn" id="fs">⛶ Fullscreen</button>
+<div id="sbar"><div id="sfill"></div></div>
+
+<!-- Three.js + official OrbitControls (r128) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CANVAS-2D HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function wrapText(ctx, text, x, y, maxW, lh) {
+  const words = text.split(' ');
+  let line = '';
+  for (let i = 0; i < words.length; i++) {
+    const test = line + words[i] + ' ';
+    if (i > 0 && ctx.measureText(test).width > maxW) {
+      ctx.fillText(line.trim(), x, y);
+      line = words[i] + ' ';
+      y += lh;
+    } else {
+      line = test;
+    }
+  }
+  if (line.trim()) ctx.fillText(line.trim(), x, y);
+  return y + lh;
+}
+
+function hline(ctx, x, y, w, col, lw) {
+  ctx.save();
+  ctx.strokeStyle = col || '#ccc8c2';
+  ctx.lineWidth = lw || 1.5;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.stroke();
+  ctx.restore();
+}
+
+// Paper background: cream + sunlight glow + grain + fibers
+function paperBg(ctx, W, H) {
+  // Warm cream
+  ctx.fillStyle = '#f4f0e8';
+  ctx.fillRect(0, 0, W, H);
+
+  // Sunlight splash top-right
+  const sg = ctx.createRadialGradient(W * .85, H * .05, 5, W * .85, H * .05, W * .75);
+  sg.addColorStop(0,   'rgba(255,245,200,.5)');
+  sg.addColorStop(.3,  'rgba(255,232,170,.2)');
+  sg.addColorStop(.7,  'rgba(255,220,150,.07)');
+  sg.addColorStop(1,   'rgba(220,200,140,0)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Cool shadow bottom-left
+  const cg = ctx.createRadialGradient(0, H, 0, 0, H, W * .55);
+  cg.addColorStop(0, 'rgba(130,145,160,.09)');
+  cg.addColorStop(1, 'rgba(130,145,160,0)');
+  ctx.fillStyle = cg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Paper fibers
+  for (let i = 0; i < 180; i++) {
+    const angle = Math.random() * Math.PI;
+    const cx = Math.random() * W, cy = Math.random() * H;
+    const len = Math.random() * 50 + 8;
+    const a = Math.random() * .038 + .007;
+    ctx.strokeStyle = `rgba(${120 + ~~(Math.random()*35)},${108 + ~~(Math.random()*25)},${88 + ~~(Math.random()*22)},${a})`;
+    ctx.lineWidth = Math.random() * .65 + .15;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * len / 2, cy + Math.sin(angle) * len / 2);
+    ctx.lineTo(cx - Math.cos(angle) * len / 2, cy - Math.sin(angle) * len / 2);
+    ctx.stroke();
+  }
+
+  // Fine grain
+  for (let i = 0; i < 6000; i++) {
+    const a = Math.random() * .04;
+    ctx.fillStyle = Math.random() > .55
+      ? `rgba(85,72,55,${a})`
+      : `rgba(250,240,220,${a})`;
+    ctx.fillRect(Math.random() * W, Math.random() * H, Math.random() * 1.8 + .2, Math.random() * 1.8 + .2);
+  }
+
+  // Corner marks
+  ctx.fillStyle = '#c0bab0';
+  [[12,12],[W-12,12],[12,H-12],[W-12,H-12]].forEach(([px,py]) => {
+    ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  FRONT TEXTURE — complete resume on one canvas
+//  Canvas 1024 × 1677  (matches paper ratio PW:PH = 2.2:3.6)
+// ─────────────────────────────────────────────────────────────────────────────
+function buildFrontCanvas() {
+  const W = 1024, H = 1677;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  paperBg(c, W, H);
+
+  const P = 52, CW = W - P * 2;    // padding, content width
+  const SPLIT = P + ~~(CW * .40);  // left col / right col split
+
+  // ── HEADER ──────────────────────────────────────────────────────
+  // Left: contact info
+  let cy = 58;
+  c.fillStyle = '#1e1e1e';
+  c.font = '17px Arial, sans-serif';
+  ['+91 (880) 081-6674', 'manish10thfeh@gmail.com', 'New Delhi, India'].forEach(t => {
+    c.fillText(t, P, cy); cy += 25;
+  });
+  cy += 6;
+  // LinkedIn | Portfolio
+  c.fillStyle = '#1352c1'; c.font = 'bold 17px Arial, sans-serif'; c.fillText('LinkedIn', P, cy);
+  c.fillStyle = '#1352c1'; c.fillRect(P, cy + 3, c.measureText('LinkedIn').width, 1.5);
+  const afterLink = P + c.measureText('LinkedIn').width;
+  c.fillStyle = '#aaa'; c.font = '17px Arial, sans-serif'; c.fillText('  |  ', afterLink, cy);
+  const afterPipe = afterLink + c.measureText('  |  ').width;
+  c.fillStyle = '#1352c1'; c.font = 'bold 17px Arial, sans-serif'; c.fillText('Portfolio', afterPipe, cy);
+  c.fillStyle = '#1352c1'; c.fillRect(afterPipe, cy + 3, c.measureText('Portfolio').width, 1.5);
+
+  // Right: name + summary
+  c.fillStyle = '#111'; c.font = 'bold 46px Georgia, serif';
+  c.fillText('Manish Patel', SPLIT, 62);
+
+  c.fillStyle = '#3e3934'; c.font = '15.5px Arial, sans-serif';
+  let sy = 80;
+  ['User Experience Designer with 1.5+ years of',
+   'experience designing enterprise web apps and',
+   'data-driven dashboards, translating complex',
+   'requirements into clear, usable interfaces.']
+    .forEach(l => { c.fillText(l, SPLIT, sy); sy += 22; });
+
+  // ── DIVIDER ──────────────────────────────────────────────────────
+  let y = 218;
+  hline(c, P, y, CW, '#cdc8c0', 1.2); y += 28;
+
+  // ── EXPERIENCE ──────────────────────────────────────────────────
+  c.fillStyle = '#111'; c.font = 'bold 26px Georgia, serif';
+  c.fillText('Experience', P, y); y += 8;
+  hline(c, P, y, CW, '#ddd8d2', 1); y += 22;
+
+  function job(title, company, loc, dates, bullets) {
+    // Title row
+    c.fillStyle = '#111'; c.font = 'bold 17.5px Arial, sans-serif';
+    c.fillText(title, P, y);
+    if (loc) {
+      c.fillStyle = '#666'; c.font = '15px Arial, sans-serif';
+      c.fillText(loc, W - P - c.measureText(loc).width, y);
+    }
+    y += 21;
+    // Company / dates row
+    c.fillStyle = '#777'; c.font = '15px Arial, sans-serif';
+    c.fillText(company, P, y);
+    c.fillStyle = '#999';
+    c.fillText(dates, W - P - c.measureText(dates).width, y);
+    y += 22;
+    // Bullets
+    c.font = '14px Arial, sans-serif';
+    bullets.forEach(b => {
+      c.fillStyle = '#555';
+      c.beginPath(); c.arc(P + 6, y - 4.5, 2.5, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#1c1c1c';
+      y = wrapText(c, b, P + 16, y, CW - 16, 20);
+      y += 1;
+    });
+    y += 12;
+  }
+
+  job('UX/UI Designer', 'Retail One Solutions & Services (ROSS)',
+    'New Delhi, India', 'Sep 2024 – Present', [
+    'Spearheaded end-to-end UX/UI design for Koncept Global Books EdTech platform, delivering role-based dashboards accelerating test creation by 50%.',
+    'Transformed Farmers App into B2B marketplace (Country Delight model), securing 2 new partnerships in Q1 2024-2025.',
+    'Designed and launched 3 responsive websites — time-on-page +429% (7s→37s), conversion +25%, 200+ leads in 2025-2026.',
+    'Developed comprehensive brand identity system for ROSS: logo revamp, guidelines, and design manual.',
+    'LinkedIn strategy: 20+ design posts that positioned ROSS as industry thought leader.',
+  ]);
+
+  job('Freelance UX Designer', 'Self Employed', '', 'Nov 2025 – Present', [
+    'Delivered 2 conversion-optimized websites for hotel and banquet sectors, achieving 45% increase in lead generation.',
+    'Secured 3rd place in New Forms Design Challenge among 200+ international designers.',
+  ]);
+
+  // ── DIVIDER ──────────────────────────────────────────────────────
+  hline(c, P, y, CW, '#cdc8c0', 1.2); y += 24;
+
+  // ── SKILLS ──────────────────────────────────────────────────────
+  c.fillStyle = '#111'; c.font = 'bold 26px Georgia, serif';
+  c.fillText('Skills', P, y); y += 8;
+  hline(c, P, y, CW, '#ddd8d2', 1); y += 20;
+
+  const skillCols = [
+    { t: 'Design & Prototyping', items: ['Figma', 'Paper', 'Framer', 'Adobe Illustrator', 'Wireframing', 'Lottielabs', 'Jitter', 'HTML, CSS, JS'] },
+    { t: 'Research & Strategy',  items: ['User Research', 'Usability Testing', 'Information Architecture', 'Market Research', 'Google Analytics'] },
+    { t: 'Systems & Visual Design', items: ['Design Systems', 'Design Libraries', 'Typography', 'Visual Design', 'Animation (Jitter)'] },
+  ];
+  const cw3 = ~~(CW / 3), sy0 = y;
+  let maxY = y;
+  skillCols.forEach((col, i) => {
+    const cx = P + i * cw3; let iy = sy0;
+    c.fillStyle = '#111'; c.font = 'bold 14.5px Arial, sans-serif'; c.fillText(col.t, cx, iy); iy += 20;
+    col.items.forEach(item => {
+      c.fillStyle = '#777'; c.beginPath(); c.arc(cx + 5, iy - 4.5, 2, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#222'; c.font = '13.5px Arial, sans-serif'; c.fillText(item, cx + 13, iy); iy += 19;
+    });
+    if (iy > maxY) maxY = iy;
+  });
+  y = maxY + 20;
+
+  // ── DIVIDER ──────────────────────────────────────────────────────
+  hline(c, P, y, CW, '#cdc8c0', 1.2); y += 24;
+
+  // ── EDUCATION ───────────────────────────────────────────────────
+  c.fillStyle = '#111'; c.font = 'bold 26px Georgia, serif';
+  c.fillText('Education & Certifications', P, y); y += 8;
+  hline(c, P, y, CW, '#ddd8d2', 1); y += 22;
+
+  function edu(degree, school, dates) {
+    c.fillStyle = '#111'; c.font = 'bold 16px Arial, sans-serif'; c.fillText(degree, P, y);
+    c.fillStyle = '#888'; c.font = '14px Arial, sans-serif';
+    c.fillText(dates, W - P - c.measureText(dates).width, y); y += 20;
+    c.fillStyle = '#999'; c.font = '14px Arial, sans-serif'; c.fillText(school, P, y); y += 28;
+  }
+  edu('Advanced UI/UX Design Program', 'Arean Animation', 'Jun 2023 – Sep 2024');
+  edu("Bachelor's in English (Honors)", 'Delhi University', 'Aug 2021 – Aug 2024');
+
+  // Footer
+  c.fillStyle = 'rgba(148,138,124,.32)';
+  c.font = '11px Arial, sans-serif';
+  c.fillText('MANISH PATEL  ·  UX/UI DESIGNER  ·  manish10thfeh@gmail.com', P, H - 18);
+
+  return cv;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  BACK CANVAS — simple decorative
+// ─────────────────────────────────────────────────────────────────────────────
+function buildBackCanvas() {
+  const W = 512, H = 838;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  paperBg(c, W, H);
+  c.fillStyle = 'rgba(100,90,78,.1)';
+  c.font = 'bold 180px Georgia, serif';
+  c.textAlign = 'center';
+  c.fillText('MP', W / 2, H / 2 + 55);
+  c.fillStyle = 'rgba(100,90,78,.2)';
+  c.font = 'bold 14px Arial, sans-serif';
+  c.fillText('MANISH PATEL  ·  UX/UI DESIGNER', W / 2, H / 2 + 110);
+  c.textAlign = 'left';
+  return cv;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  WOOD CANVAS
+// ─────────────────────────────────────────────────────────────────────────────
+function buildWoodCanvas() {
+  const W = 512, H = 512;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  const g = c.createLinearGradient(0, 0, W, 0);
+  g.addColorStop(0, '#6b4423'); g.addColorStop(.3, '#7d5230');
+  g.addColorStop(.6, '#8b5e38'); g.addColorStop(1, '#6b4423');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  for (let i = 0; i < 55; i++) {
+    const x = (i / 55) * W * 1.5 - W * .25;
+    const a = .05 + Math.random() * .12;
+    c.strokeStyle = Math.random() > .5 ? `rgba(28,8,0,${a})` : `rgba(200,150,80,${a * .5})`;
+    c.lineWidth = Math.random() * 3.5 + .5;
+    c.beginPath(); c.moveTo(x, 0);
+    for (let yy = 0; yy <= H; yy += 4)
+      c.lineTo(x + Math.sin(yy * .022 + i) * 14 + Math.sin(yy * .055) * 5, yy);
+    c.stroke();
+  }
+  // Knot
+  for (let r = 26; r > 0; r -= 2) {
+    c.strokeStyle = `rgba(40,15,0,${.04 + (26-r) * .003})`; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(W * .65, H * .35, r * 1.3, r * .7, .2, 0, Math.PI * 2); c.stroke();
+  }
+  const sh = c.createLinearGradient(0, 0, W, H);
+  sh.addColorStop(0, 'rgba(255,230,180,.1)'); sh.addColorStop(.4, 'rgba(255,220,160,.18)'); sh.addColorStop(1, 'rgba(200,150,80,.04)');
+  c.fillStyle = sh; c.fillRect(0, 0, W, H);
+  return cv;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  THREE.JS SCENE
+// ─────────────────────────────────────────────────────────────────────────────
+const canvas3d = document.getElementById('c');
+
+const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x7a9ab2, 1);  // explicit sky-blue clear
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x7a9ab2);
+scene.fog = new THREE.Fog(0x7a9ab2, 14, 34);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 200);
+camera.position.set(4, 3.5, 5);
+
+// Official r128 OrbitControls
+const controls = new THREE.OrbitControls(camera, canvas3d);
+controls.enableDamping = true;
+controls.dampingFactor = .06;
+controls.minDistance = 1.5;
+controls.maxDistance = 22;
+controls.maxPolarAngle = Math.PI * .46;
+controls.target.set(0, 0, 0);
+controls.update();
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LIGHTS
+// ─────────────────────────────────────────────────────────────────────────────
+scene.add(new THREE.HemisphereLight(0x90c0e0, 0x44301e, .55));
+
+const sun = new THREE.DirectionalLight(0xffefd5, 1.8);
+sun.position.set(12, 18, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.width  = 2048;
+sun.shadow.mapSize.height = 2048;
+sun.shadow.camera.near   = 0.5;
+sun.shadow.camera.far    = 80;
+sun.shadow.camera.left   = -12;
+sun.shadow.camera.right  = 12;
+sun.shadow.camera.top    = 12;
+sun.shadow.camera.bottom = -12;
+sun.shadow.bias = -.0008;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0xaac8e8, .32);
+fill.position.set(-10, 8, -6);
+scene.add(fill);
+
+// Reading spotlight — fades in when paper is held up
+const readLight = new THREE.SpotLight(0xfff8ee, 0, 14, Math.PI / 4.5, .35, 1.0);
+readLight.position.set(0, 6, 3.5);
+readLight.target.position.set(0, 1.6, 0);
+scene.add(readLight);
+scene.add(readLight.target);
+
+// Volumetric sun shaft (cone, additive blending, no dust)
+const shaftMat = new THREE.MeshBasicMaterial({
+  color: 0xffe8a0, transparent: true, opacity: .045,
+  side: THREE.BackSide, depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+const shaft = new THREE.Mesh(new THREE.ConeGeometry(3.6, 9, 8, 1, true), shaftMat);
+shaft.position.set(8, 9, 6);
+shaft.rotation.z = -.52; shaft.rotation.x = .22;
+scene.add(shaft);
+
+const shaftMat2 = shaftMat.clone(); shaftMat2.opacity = .018;
+const shaft2 = new THREE.Mesh(new THREE.ConeGeometry(5.2, 11, 8, 1, true), shaftMat2);
+shaft2.position.copy(shaft.position); shaft2.rotation.copy(shaft.rotation);
+scene.add(shaft2);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+const woodTex = new THREE.CanvasTexture(buildWoodCanvas());
+woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
+woodTex.repeat.set(2, 1);
+
+const tableMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(7, .22, 5),
+  new THREE.MeshStandardMaterial({ map: woodTex, roughness: .44, metalness: .04 })
+);
+tableMesh.position.y = -.11;
+tableMesh.receiveShadow = true;
+scene.add(tableMesh);
+
+// Legs
+const legMat = new THREE.MeshStandardMaterial({ color: 0x3d2210, roughness: .72 });
+[[-3.1, -.81, -2.1], [-3.1, -.81, 2.1], [3.1, -.81, -2.1], [3.1, -.81, 2.1]].forEach(p => {
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(.12, 1.4, .12), legMat);
+  leg.position.set(...p); leg.castShadow = true; scene.add(leg);
+});
+scene.add(new THREE.Mesh(
+  new THREE.BoxGeometry(7.02, .03, 5.02),
+  new THREE.MeshStandardMaterial({ color: 0x8b5e38, roughness: .18, metalness: .08 })
+));
+
+// Props: mug
+const mugMat = new THREE.MeshStandardMaterial({ color: 0xfaf6f0, roughness: .28 });
+const mug = new THREE.Mesh(new THREE.CylinderGeometry(.24, .21, .48, 28), mugMat);
+mug.position.set(2.4, .24, .8); mug.castShadow = true; scene.add(mug);
+
+const handle = new THREE.Mesh(new THREE.TorusGeometry(.13, .028, 8, 16, Math.PI), mugMat);
+handle.position.set(2.64, .24, .8); handle.rotation.y = Math.PI / 2; scene.add(handle);
+
+const coffeeTop = new THREE.Mesh(
+  new THREE.CircleGeometry(.21, 28),
+  new THREE.MeshStandardMaterial({ color: 0x3a1900, roughness: .4 })
+);
+coffeeTop.rotation.x = -Math.PI / 2;
+coffeeTop.position.set(2.4, .504, .8);
+scene.add(coffeeTop);
+
+// Props: pen
+const penMat = new THREE.MeshStandardMaterial({ color: 0x12122a, roughness: .28, metalness: .65 });
+const pen = new THREE.Mesh(new THREE.CylinderGeometry(.024, .024, 1.55, 14), penMat);
+pen.position.set(-2.1, .05, -.45);
+pen.rotation.z = Math.PI / 2; pen.rotation.y = .28;
+pen.castShadow = true; scene.add(pen);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PAPER GROUP  — PW=2.2 × PH=3.6  (fills viewport width in reading mode)
+// ─────────────────────────────────────────────────────────────────────────────
+const PW = 2.2, PH = 3.6;
+const paperGroup = new THREE.Group();
+scene.add(paperGroup);
+
+// Textures — smaller canvases + LINEAR filter (no mipmaps needed at this distance)
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+const frontTex = new THREE.CanvasTexture(buildFrontCanvas());
+frontTex.generateMipmaps = false;
+frontTex.minFilter = THREE.LinearFilter;
+frontTex.anisotropy = maxAniso;
+
+const backTex = new THREE.CanvasTexture(buildBackCanvas());
+backTex.generateMipmaps = false;
+backTex.minFilter = THREE.LinearFilter;
+backTex.anisotropy = maxAniso;
+
+// Front face (FrontSide)
+const frontMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(PW, PH),
+  new THREE.MeshStandardMaterial({ map: frontTex, roughness: .80, metalness: .02, side: THREE.FrontSide })
+);
+frontMesh.position.z = .006;
+frontMesh.castShadow = true;
+paperGroup.add(frontMesh);
+
+// Back face (BackSide so it shows when paper is flipped toward you from behind)
+const backMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(PW, PH),
+  new THREE.MeshStandardMaterial({ map: backTex, roughness: .80, metalness: .02, side: THREE.BackSide })
+);
+backMesh.position.z = -.006;
+paperGroup.add(backMesh);
+
+// Paper edge thickness strip
+paperGroup.add(new THREE.Mesh(
+  new THREE.BoxGeometry(PW, PH, .012),
+  new THREE.MeshStandardMaterial({ color: 0xf0e8de, roughness: .92 })
+));
+
+// Shadow catcher on table
+const shadowCatcher = new THREE.Mesh(
+  new THREE.PlaneGeometry(PW + .5, PH + .5),
+  new THREE.ShadowMaterial({ opacity: .2 })
+);
+shadowCatcher.rotation.x = -Math.PI / 2;
+shadowCatcher.position.y = .002;
+shadowCatcher.receiveShadow = true;
+scene.add(shadowCatcher);
+
+// Paper initial state: lying flat on table, front-face up (rotX = -90°)
+const INIT_Y  = .12;
+const INIT_RX = -Math.PI / 2;
+const INIT_RZ = .07;
+paperGroup.position.set(0, INIT_Y, 0);
+paperGroup.rotation.x = INIT_RX;
+paperGroup.rotation.z = INIT_RZ;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  READING-MODE CAMERA MATH
+//  Paper center after flip: y = FLIP_Y = 1.6
+//  Paper top edge:    1.6 + PH/2 = 1.6 + 1.8 = 3.4
+//  Paper bottom edge: 1.6 - PH/2 = 1.6 - 1.8 = -0.2
+//  At READ_Z=1.12, FOV=60°:  visible_half_h = 1.12 × tan(30°) ≈ 0.647
+//
+//  READ_TOP = paper_top   - vis_half  = 3.4  - 0.647 = 2.753  ← shows paper top
+//  READ_BOT = paper_bottom+ vis_half  = -0.2 + 0.647 = 0.447  ← shows paper bottom
+// ─────────────────────────────────────────────────────────────────────────────
+const FLIP_Y   = 1.6;
+const READ_Z   = 1.12;
+const VIS_HALF = READ_Z * Math.tan(30 * Math.PI / 180);  // ≈ 0.647
+
+const READ_TOP = (FLIP_Y + PH / 2) - VIS_HALF;   // 2.753
+const READ_BOT = (FLIP_Y - PH / 2) + VIS_HALF;   // 0.447
+
+// Smooth-scroll state
+let targetY    = READ_TOP;
+let currentY   = READ_TOP;
+let velocity   = 0;
+
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+// Progress bar
+const sfill = document.getElementById('sfill');
+const sbar  = document.getElementById('sbar');
+function updateBar() {
+  const t = (READ_TOP - currentY) / (READ_TOP - READ_BOT);
+  sfill.style.height = clamp(t, 0, 1) * 100 + '%';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  APP STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let isFlipped = false, isAnimating = false, readingMode = false;
+const savedCamPos = new THREE.Vector3(4, 3.5, 5);
+const savedTarget = new THREE.Vector3(0, 0, 0);
+
+// Raycaster
+const rc = new THREE.Raycaster();
+const mxy = new THREE.Vector2();
+function hitsPaper(e) {
+  const r = canvas3d.getBoundingClientRect();
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  mxy.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+  rc.setFromCamera(mxy, camera);
+  return rc.intersectObjects([frontMesh, backMesh], false).length > 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  FLIP UP — enter reading mode
+// ─────────────────────────────────────────────────────────────────────────────
+function flipUp() {
+  if (isFlipped || isAnimating) return;
+  isAnimating = true;
+  controls.enabled = false;
+  document.getElementById('hint').style.opacity = '0';
+  document.getElementById('back').classList.add('vis');
+  savedCamPos.copy(camera.position);
+  savedTarget.copy(controls.target);
+
+  // Always start at the TOP of the resume
+  targetY = currentY = READ_TOP;
+  velocity = 0;
+
+  const tl = gsap.timeline({ onComplete() {
+    isAnimating = false; isFlipped = true; readingMode = true;
+    document.getElementById('rdhint').style.opacity = '1';
+    sbar.style.opacity = '1'; updateBar();
+  }});
+
+  // 1. Lift paper up to FLIP_Y
+  tl.to(paperGroup.position, { y: FLIP_Y, duration: .5, ease: 'power2.out' });
+  // 2. Rotate upright, facing camera
+  tl.to(paperGroup.rotation, { x: 0, z: 0, duration: .75, ease: 'back.out(1.1)' }, '-=.15');
+  // 3. Camera glides to top-of-paper reading position
+  tl.to(camera.position, {
+    x: 0, y: READ_TOP, z: READ_Z,
+    duration: .85, ease: 'power3.inOut',
+    onUpdate() { camera.lookAt(0, camera.position.y, 0); }
+  }, '-=.5');
+  // 4. Reading light fades in
+  tl.to(readLight, { intensity: 2.2, duration: .5 }, '-=.6');
+  // 5. Tiny scale pop
+  tl.to(paperGroup.scale, { x: 1.02, y: 1.02, z: 1.02, duration: .2 }, '-=.55');
+  tl.to(paperGroup.scale, { x: 1, y: 1, z: 1, duration: .3, ease: 'power1.inOut' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PUT DOWN — exit reading mode
+// ─────────────────────────────────────────────────────────────────────────────
+function putDown() {
+  if (!isFlipped || isAnimating) return;
+  isAnimating = true; readingMode = false;
+  document.getElementById('rdhint').style.opacity = '0';
+  document.getElementById('back').classList.remove('vis');
+  sbar.style.opacity = '0';
+
+  const tl = gsap.timeline({ onComplete() {
+    isAnimating = false; isFlipped = false;
+    controls.enabled = true;
+    controls.target.copy(savedTarget);
+    document.getElementById('hint').style.opacity = '1';
+  }});
+  tl.to(readLight, { intensity: 0, duration: .3 });
+  tl.to(paperGroup.rotation, { x: INIT_RX, z: INIT_RZ, duration: .6, ease: 'power2.inOut' });
+  tl.to(paperGroup.position, { y: INIT_Y, duration: .5, ease: 'power2.in' }, '-=.3');
+  tl.to(camera.position, {
+    x: savedCamPos.x, y: savedCamPos.y, z: savedCamPos.z,
+    duration: .8, ease: 'power2.inOut',
+    onUpdate() { camera.lookAt(0, 0, 0); }
+  }, '-=.5');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SCROLL INPUT — feeds velocity; render loop applies smooth lerp
+//  Scroll DOWN (deltaY > 0) → camera moves DOWN → see lower resume content
+// ─────────────────────────────────────────────────────────────────────────────
+window.addEventListener('wheel', e => {
+  if (!readingMode) return;
+  e.preventDefault();
+  velocity -= e.deltaY * .0022;
+}, { passive: false });
+
+// Touch scroll
+let _ty = null;
+canvas3d.addEventListener('touchstart', e => { if (readingMode) _ty = e.touches[0].clientY; }, { passive: true });
+canvas3d.addEventListener('touchmove', e => {
+  if (!readingMode || _ty === null) return;
+  e.preventDefault();
+  velocity -= (_ty - e.touches[0].clientY) * .003;
+  _ty = e.touches[0].clientY;
+}, { passive: false });
+canvas3d.addEventListener('touchend', () => { _ty = null; });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CLICK / TAP
+// ─────────────────────────────────────────────────────────────────────────────
+let mdPos = { x: 0, y: 0 };
+canvas3d.addEventListener('mousedown', e => { mdPos = { x: e.clientX, y: e.clientY }; });
+canvas3d.addEventListener('click', e => {
+  if (Math.abs(e.clientX - mdPos.x) > 6 || Math.abs(e.clientY - mdPos.y) > 6) return; // ignore drags
+  if (!isFlipped && !isAnimating && hitsPaper(e)) { flipUp(); return; }
+  if (readingMode && !isAnimating && !hitsPaper(e)) putDown();
+});
+canvas3d.addEventListener('touchend', e => {
+  if (!isFlipped && !isAnimating) {
+    const t = e.changedTouches[0];
+    if (hitsPaper({ clientX: t.clientX, clientY: t.clientY })) flipUp();
+  }
+}, { passive: true });
+
+document.getElementById('back').addEventListener('click', putDown);
+document.getElementById('fs').addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+    document.getElementById('fs').textContent = '✕ Exit';
+  } else {
+    document.exitFullscreen();
+    document.getElementById('fs').textContent = '⛶ Fullscreen';
+  }
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  RENDER LOOP
+// ─────────────────────────────────────────────────────────────────────────────
+function tick() {
+  requestAnimationFrame(tick);
+  const t = Date.now();
+
+  // Idle float while lying on table
+  if (!isFlipped && !isAnimating) {
+    paperGroup.position.y = INIT_Y + Math.sin(t * .0018) * .016;
+  }
+
+  // Smooth scroll with momentum + lerp easing
+  if (readingMode) {
+    targetY   = clamp(targetY + velocity, READ_BOT, READ_TOP);
+    velocity *= .80;                                      // friction
+    if (Math.abs(velocity) < .00004) velocity = 0;
+    currentY += (targetY - currentY) * .12;              // smooth lerp
+
+    camera.position.y = currentY;
+    camera.lookAt(0, currentY, 0);
+    updateBar();
+  }
+
+  sun.intensity = 1.8 + Math.sin(t * .00022) * .05;     // subtle sun flicker
+  shaftMat.opacity = .045 + Math.sin(t * .0007) * .006;  // shaft shimmer
+
+  if (!readingMode) controls.update();
+  renderer.render(scene, camera);
+}
+
+tick();
+</script>
+</body>
+</html>
