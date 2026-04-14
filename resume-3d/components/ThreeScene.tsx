@@ -55,7 +55,7 @@ export default function ThreeScene() {
 
   const [mode,          setMode         ] = useState<'idle' | 'reading'>('idle')
   const [canvasVisible, setCanvasVisible ] = useState(false)
-  const { muted, toggleMute } = useAmbientSound()
+  const { muted, toggleMute, volume, setVolume } = useAmbientSound()
 
   // Fade in once texture is ready
   useEffect(() => {
@@ -158,35 +158,67 @@ export default function ThreeScene() {
         zIndex       : 10,
       }} />
 
-      {/* ── Mute button — always visible ── */}
+      {/* ── Sound widget (mute + volume slider) — always visible ── */}
       {canvasVisible && (
-        <button
-          onClick={toggleMute}
-          title={muted ? 'Unmute sounds' : 'Mute sounds'}
+        <div
           style={{
-            position     : 'fixed',
-            top          : '20px',
-            right        : mode === 'reading' ? 'auto' : '20px',
-            left         : mode === 'reading' ? '130px' : 'auto',
-            zIndex       : 25,
-            cursor       : 'pointer',
-            display      : 'flex',
-            alignItems   : 'center',
-            justifyContent: 'center',
-            width        : '38px',
-            height       : '38px',
-            background   : 'rgba(255,255,255,0.13)',
-            backdropFilter: 'blur(10px)',
+            position        : 'fixed',
+            bottom          : '28px',
+            right           : '20px',
+            zIndex          : 25,
+            display         : 'flex',
+            alignItems      : 'center',
+            gap             : '8px',
+            background      : 'rgba(255,255,255,0.13)',
+            backdropFilter  : 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
-            border       : '1px solid rgba(255,255,255,0.22)',
-            borderRadius : '50%',
-            color        : 'rgba(255,255,255,0.85)',
-            fontSize     : '16px',
-            transition   : 'background 0.2s',
+            border          : '1px solid rgba(255,255,255,0.22)',
+            borderRadius    : '24px',
+            padding         : '7px 14px 7px 10px',
+            transition      : 'background 0.2s',
           }}
         >
-          {muted ? '🔇' : '🔊'}
-        </button>
+          {/* Mute toggle icon */}
+          <button
+            onClick={toggleMute}
+            title={muted ? 'Unmute' : 'Mute'}
+            style={{
+              background : 'none',
+              border     : 'none',
+              cursor     : 'pointer',
+              padding    : '0',
+              display    : 'flex',
+              alignItems : 'center',
+              color      : 'rgba(255,255,255,0.85)',
+              fontSize   : '15px',
+              lineHeight : 1,
+            }}
+          >
+            {muted || volume === 0 ? '🔇' : volume < 0.4 ? '🔉' : '🔊'}
+          </button>
+
+          {/* Volume slider */}
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={muted ? 0 : volume}
+            onChange={e => {
+              const v = parseFloat(e.target.value)
+              if (muted && v > 0) toggleMute()   // auto-unmute on drag
+              setVolume(v)
+            }}
+            style={{
+              width          : '72px',
+              height         : '3px',
+              accentColor    : 'rgba(255,255,255,0.80)',
+              cursor         : 'pointer',
+              outline        : 'none',
+              verticalAlign  : 'middle',
+            }}
+          />
+        </div>
       )}
 
       {/* ── Idle hint ── */}

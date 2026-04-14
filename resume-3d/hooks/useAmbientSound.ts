@@ -14,8 +14,10 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 export function useAmbientSound() {
   const [muted,   setMuted  ] = useState(false)
   const [started, setStarted] = useState(false)
+  const [volume,  setVolumeSt] = useState(0.7)
   const ctxRef    = useRef<AudioContext | null>(null)
   const masterRef = useRef<GainNode | null>(null)
+  const volumeRef = useRef(0.7)   // shadow ref — avoids stale closures
 
   // ── Build the audio graph ───────────────────────────────────────────────
   const startAudio = useCallback(() => {
@@ -27,7 +29,7 @@ export function useAmbientSound() {
     ctxRef.current = ctx
 
     const master = ctx.createGain()
-    master.gain.value = 0.38
+    master.gain.value = volumeRef.current * 0.55   // scale 0–1 → 0–0.55
     master.connect(ctx.destination)
     masterRef.current = master
 
@@ -154,12 +156,27 @@ export function useAmbientSound() {
     if (!masterRef.current || !ctxRef.current) return
     const next = !muted
     masterRef.current.gain.setTargetAtTime(
-      next ? 0 : 0.38,
+      next ? 0 : volumeRef.current * 0.55,
       ctxRef.current.currentTime,
       0.15,
     )
     setMuted(next)
   }, [muted])
 
-  return { muted, toggleMute, started }
+  // ── Set volume (0–1) ────────────────────────────────────────────────────
+  const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(1, v))
+    volumeRef.current = clamped
+    setVolumeSt(clamped)
+    if (!masterRef.current || !ctxRef.current) return
+    if (!muted) {
+      masterRef.current.gain.setTargetAtTime(
+        clamped * 0.55,
+        ctxRef.current.currentTime,
+        0.05,
+      )
+    }
+  }, [muted])
+
+  return { muted, toggleMute, volume, setVolume, started }
 }

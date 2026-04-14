@@ -8,17 +8,43 @@ import gsap from 'gsap'
 import type { MouseCoords } from '@/hooks/useMouseParallax'
 
 // ── Scene constants ──────────────────────────────────────────────────────────
-const PW = 3.2
-const PH = 5.0          // taller paper
-const FLIP_Y  = 2.6     // lift high enough so bottom edge clears the desk (2.6 - 2.5 = 0.1)
-const READ_Z  = 3.2     // closer reading distance
-// FOV=45 → half-angle=22.5° → vis_half = READ_Z * tan(22.5°)
-const VIS      = READ_Z * Math.tan(22.5 * Math.PI / 180)  // ~1.325
-const READ_TOP = (FLIP_Y + PH / 2) - VIS   // ~3.775
-const READ_BOT = (FLIP_Y - PH / 2) + VIS   // ~1.425
+const PW      = 3.2
+const PH      = 5.0
+const FLIP_Y  = 2.6
+const READ_Z  = 3.2
+const VIS      = READ_Z * Math.tan(22.5 * Math.PI / 180)
+const READ_TOP = (FLIP_Y + PH / 2) - VIS
+const READ_BOT = (FLIP_Y - PH / 2) + VIS
+const I_RX    = -Math.PI / 2
+const I_RZ    =  0.08
 
-const I_RX = -Math.PI / 2   // flat on desk
-const I_RZ =  0.08          // cinematic tilt
+// ── Curl deformation helper ───────────────────────────────────────────────────
+// Applied to the BoxGeometry vertices every frame when curlProgress > 0.
+// Bends the front edge (local y = -PH/2) upward along local +z so it looks
+// like a real paper being picked up from the desk.
+function applyPaperCurl(
+  geo       : THREE.BufferGeometry,
+  origPos   : Float32Array,
+  progress  : number,            // 0 = flat, 1 = max curl
+) {
+  const attr = geo.getAttribute('position') as THREE.BufferAttribute
+  const arr  = attr.array as Float32Array
+  const MAX_CURL = PH * 0.38    // front edge lifts ~1.9 units at full curl
+
+  for (let i = 0; i < arr.length / 3; i++) {
+    const oy = origPos[i * 3 + 1]
+    // p=0 at bottom/front (y=-PH/2), p=1 at top/back (y=+PH/2)
+    const p = (oy + PH / 2) / PH
+    // Quadratic fall-off: bottom gets full curl, top gets none
+    const bend = progress * Math.pow(Math.max(0, 1 - p), 2.4) * MAX_CURL
+
+    arr[i * 3]     = origPos[i * 3]
+    arr[i * 3 + 1] = oy
+    arr[i * 3 + 2] = origPos[i * 3 + 2] + bend
+  }
+  attr.needsUpdate = true
+  geo.computeVertexNormals()
+}
 
 interface PaperMeshProps {
   resumeTexture : THREE.CanvasTexture | null
@@ -33,10 +59,11 @@ export default function PaperMesh({
   isMobile,
   onModeChange,
 }: PaperMeshProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const meshRef   = useRef<THREE.Mesh>(null)
+  const origPos   = useRef<Float32Array | null>(null)   // snapshot of flat vertex positions
   const { camera, scene } = useThree()
 
-  // ── Animation state (all in one ref — no re-renders in the loop) ──────────
+  // ── Animation state ──────────────────────────────────────────────────────
   const st = useRef({
     isFlipped   : false,
     isAnimating : false,
@@ -46,9 +73,18 @@ export default function PaperMesh({
     scrollNow   : READ_TOP,
     savedCam    : new THREE.Vector3(2.5, 4, 5.5),
     savedBg     : { r: 0.788, g: 0.729, b: 0.651 },
+    curlProgress: 0,               // 0=flat  1=fully curled
   })
 
-  // ── Real PBR texture maps (useTexture suspends until all are ready) ───────
+  // ── Capture original vertex positions after mount ─────────────────────────
+  useEffect(() => {
+    const mesh = meshRef.current
+    if (!mesh) return
+    const attr = (mesh.geometry as THREE.BufferGeometry).getAttribute('position') as THREE.BufferAttribute
+    origPos.current = new Float32Array(attr.array)
+  }, [])
+
+  // ── PBR texture maps ──────────────────────────────────────────────────────
   const [colorMap, roughnessMap, normalMap, displacementMap] = useTexture([
     '/textures/paper-color.jpg',
     '/textures/paper-roughness.jpg',
@@ -56,63 +92,45 @@ export default function PaperMesh({
     '/textures/paper-displacement.jpg',
   ])
 
-  // ── Configure textures once loaded ───────────────────────────────────────
-  // Runs synchronously inside useMemo after useTexture resolves the Suspense,
-  // so textures are guaranteed to exist here.
   useMemo(() => {
-    // All maps tile — 1 repeat per PW width, 1.4 per PH height (A4 proportions)
     const allMaps = [colorMap, roughnessMap, normalMap, displacementMap]
     allMaps.forEach(tex => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping
       tex.repeat.set(1, 1.4)
       tex.needsUpdate = true
     })
-
-    // Non-color data maps must NOT be gamma-corrected — set to linear
-    roughnessMap.colorSpace   = THREE.NoColorSpace
-    normalMap.colorSpace      = THREE.NoColorSpace
+    roughnessMap.colorSpace    = THREE.NoColorSpace
+    normalMap.colorSpace       = THREE.NoColorSpace
     displacementMap.colorSpace = THREE.NoColorSpace
-    roughnessMap.needsUpdate   = true
-    normalMap.needsUpdate      = true
-    displacementMap.needsUpdate = true
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colorMap, roughnessMap, normalMap, displacementMap])
 
   // ── 6-material array ──────────────────────────────────────────────────────
-  // BoxGeometry face order: 0 right, 1 left, 2 top, 3 bottom, 4 front, 5 back
   const materials = useMemo(() => {
-    // Factory for the shared PBR paper material (sides + back)
     const paperMat = (overrides: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
       new THREE.MeshStandardMaterial({
-        map              : colorMap,
-        roughnessMap,
-        normalMap,
-        normalScale      : new THREE.Vector2(0.3, 0.3),
-        displacementMap,
-        displacementScale: 0.002,   // 2 mm — very subtle, paper is thin
-        roughness        : 0.85,
-        metalness        : 0.0,
+        map: colorMap, roughnessMap, normalMap,
+        normalScale: new THREE.Vector2(0.3, 0.3),
+        displacementMap, displacementScale: 0.002,
+        roughness: 0.85, metalness: 0.0,
         ...overrides,
       })
-
     return [
-      paperMat(),                      // 0 right  (+x edge)
-      paperMat(),                      // 1 left   (-x edge)
-      paperMat(),                      // 2 top    (+y edge)
-      paperMat(),                      // 3 bottom (-y edge)
-      new THREE.MeshStandardMaterial({ // 4 FRONT (+z) — clean resume surface
-        map      : resumeTexture ?? colorMap,
-        roughness: 0.55,               // moderate roughness — avoids specular wash-out
-        metalness: 0.0,
-        // no roughnessMap / normalMap / displacementMap — keeps the print sharp
+      paperMat(),
+      paperMat(),
+      paperMat(),
+      paperMat(),
+      new THREE.MeshStandardMaterial({
+        map: resumeTexture ?? colorMap,
+        roughness: 0.55, metalness: 0.0,
       }),
-      paperMat({ roughness: 0.90 }),  // 5 back   (-z)
+      paperMat({ roughness: 0.90 }),
     ] as THREE.MeshStandardMaterial[]
   }, [colorMap, roughnessMap, normalMap, displacementMap, resumeTexture])
 
   useEffect(() => () => materials.forEach(m => m.dispose()), [materials])
 
-  // ── Flip up ───────────────────────────────────────────────────────────────
+  // ── Flip up (physics roll) ────────────────────────────────────────────────
   const flipUp = useCallback(() => {
     const s    = st.current
     const mesh = meshRef.current
@@ -127,10 +145,8 @@ export default function PaperMesh({
     if (scene.background instanceof THREE.Color)
       s.savedBg = { r: scene.background.r, g: scene.background.g, b: scene.background.b }
 
-    // Background → cool reading blue-gray
     gsap.to(scene.background as THREE.Color, {
-      r: 0.72, g: 0.77, b: 0.80,
-      duration: 0.9, ease: 'power2.inOut',
+      r: 0.72, g: 0.77, b: 0.80, duration: 1.1, ease: 'power2.inOut',
     })
 
     gsap.timeline({
@@ -141,18 +157,48 @@ export default function PaperMesh({
         onModeChange('reading')
       },
     })
-    .to(mesh.position, { y: FLIP_Y, duration: 0.55, ease: 'power2.out' })
-    .to(mesh.rotation, { x: 0, y: 0, z: 0, duration: 0.85, ease: 'back.out(1.04)' }, '-=0.12')
+    // Phase 1 — front edge curls up (paper peeling off desk)
+    .to(s, {
+      curlProgress: 1,
+      duration: 0.42,
+      ease: 'power2.in',
+    })
+    // Phase 2 — lift while still curled
+    .to(mesh.position, {
+      y: FLIP_Y * 0.5,
+      duration: 0.38,
+      ease: 'power1.out',
+    }, '-=0.18')
+    // Phase 3 — begin uncurl + continue lift
+    .to(s, {
+      curlProgress: 0,
+      duration: 0.52,
+      ease: 'power2.out',
+    }, '-=0.12')
+    .to(mesh.position, {
+      y: FLIP_Y,
+      duration: 0.42,
+      ease: 'power2.out',
+    }, '-=0.48')
+    // Phase 4 — rotate to face camera with spring overshoot
+    .to(mesh.rotation, {
+      x: 0, y: 0, z: 0,
+      duration: 0.78,
+      ease: 'back.out(1.3)',
+    }, '-=0.22')
+    // Phase 5 — camera slides in
     .to(camera.position, {
       x: 0, y: FLIP_Y, z: READ_Z,
-      duration: 0.9, ease: 'power3.inOut',
+      duration: 0.92,
+      ease: 'power3.inOut',
       onUpdate() { camera.lookAt(0, camera.position.y, 0) },
-    }, '-=0.60')
-    .to(mesh.scale, { x: 1.04, y: 1.04, z: 1.04, duration: 0.16 }, '-=0.52')
-    .to(mesh.scale, { x: 1,    y: 1,    z: 1,    duration: 0.34, ease: 'power1.inOut' })
+    }, '-=0.54')
+    // Phase 6 — subtle scale breathe
+    .to(mesh.scale, { x: 1.03, y: 1.03, z: 1.03, duration: 0.14 }, '-=0.48')
+    .to(mesh.scale, { x: 1,    y: 1,    z: 1,    duration: 0.32, ease: 'power1.inOut' })
   }, [camera, scene, onModeChange])
 
-  // ── Put down ──────────────────────────────────────────────────────────────
+  // ── Put down (physics settle) ─────────────────────────────────────────────
   const putDown = useCallback(() => {
     const s    = st.current
     const mesh = meshRef.current
@@ -161,10 +207,8 @@ export default function PaperMesh({
     s.isAnimating = true
     s.inReading   = false
 
-    // Background → restore warm beige
     gsap.to(scene.background as THREE.Color, {
-      ...s.savedBg,
-      duration: 0.8, ease: 'power2.inOut',
+      ...s.savedBg, duration: 0.9, ease: 'power2.inOut',
     })
 
     gsap.timeline({
@@ -174,25 +218,28 @@ export default function PaperMesh({
         onModeChange('idle')
       },
     })
-    .to(mesh.scale,    { x: 1,    y: 1,    z: 1,    duration: 0.10 })
-    .to(mesh.rotation, { x: I_RX, y: 0,   z: I_RZ, duration: 0.60, ease: 'power2.inOut' })
-    .to(mesh.position, { y: 0,                       duration: 0.50, ease: 'power2.in' }, '-=0.30')
+    // Gentle curl as paper starts to tip over
+    .to(s, { curlProgress: 0.55, duration: 0.30, ease: 'power1.in' })
+    // Rotate toward desk
+    .to(mesh.rotation, { x: I_RX, y: 0, z: I_RZ, duration: 0.65, ease: 'power2.inOut' }, '-=0.10')
+    // Uncurl as it approaches flat
+    .to(s, { curlProgress: 0, duration: 0.40, ease: 'power2.out' }, '-=0.35')
+    // Drop to desk
+    .to(mesh.position, { y: 0, duration: 0.46, ease: 'power2.in' }, '-=0.32')
+    // Camera returns
     .to(camera.position, {
       x: s.savedCam.x, y: s.savedCam.y, z: s.savedCam.z,
-      duration: 0.82, ease: 'power2.inOut',
+      duration: 0.84, ease: 'power2.inOut',
       onUpdate() { camera.lookAt(0, 0, 0) },
-    }, '-=0.45')
+    }, '-=0.40')
   }, [camera, scene, onModeChange])
 
-  // Expose putDown for UI button + ESC
   useEffect(() => {
     ;(window as Window & { __resumePutDown?: () => void }).__resumePutDown = putDown
-    return () => {
-      delete (window as Window & { __resumePutDown?: () => void }).__resumePutDown
-    }
+    return () => { delete (window as Window & { __resumePutDown?: () => void }).__resumePutDown }
   }, [putDown])
 
-  // ── Scroll (reading mode) ─────────────────────────────────────────────────
+  // ── Scroll ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       if (!st.current.inReading) return
@@ -226,6 +273,20 @@ export default function PaperMesh({
     const s    = st.current
     if (!mesh) return
 
+    // ── Curl deformation ──────────────────────────────────────────────────
+    if (origPos.current) {
+      const geo = mesh.geometry as THREE.BufferGeometry
+      if (s.curlProgress > 0.002) {
+        applyPaperCurl(geo, origPos.current, s.curlProgress)
+      } else {
+        // Snap back to perfectly flat — avoids floating-point drift
+        const attr = geo.getAttribute('position') as THREE.BufferAttribute
+        ;(attr.array as Float32Array).set(origPos.current)
+        attr.needsUpdate = true
+        geo.computeVertexNormals()
+      }
+    }
+
     if (s.inReading) {
       s.scrollTarget = Math.max(READ_BOT, Math.min(READ_TOP, s.scrollTarget + s.scrollVel))
       s.scrollVel   *= 0.80
@@ -240,7 +301,7 @@ export default function PaperMesh({
     if (!s.isFlipped && !s.isAnimating)
       mesh.position.y = Math.sin(Date.now() * 0.0013) * 0.013
 
-    // Mouse parallax — subtle z-rotation while flat on desk
+    // Mouse parallax
     if (!s.isAnimating && !s.isFlipped) {
       const { x } = mouseRef.current
       mesh.rotation.z = THREE.MathUtils.lerp(mesh.rotation.z, I_RZ + x * 0.016, 0.04)
@@ -263,16 +324,8 @@ export default function PaperMesh({
         if (!st.current.isFlipped && !st.current.isAnimating) flipUp()
       }}
     >
-      {/*
-        Segments: 40 wide × 56 tall gives ~2240 quads on the main face —
-        enough resolution for displacementMap at 0.002 scale to produce
-        a visible (but subtle) surface relief.
-      */}
-      {/*
-        8×12 segments is plenty for displacementScale=0.002 (2 mm of relief).
-        Dropping from 40×70 cuts vertex count from ~5600 to ~216 — big perf win.
-      */}
-      <boxGeometry args={[PW, PH, 0.012, 8, 12, 1]} />
+      {/* 12×24 segments — enough resolution for smooth curl deformation */}
+      <boxGeometry args={[PW, PH, 0.012, 12, 24, 1]} />
     </mesh>
   )
 }
