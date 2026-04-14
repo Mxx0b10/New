@@ -8,6 +8,7 @@ import * as THREE from 'three'
 import SceneLights   from './SceneLights'
 import PaperMesh     from './PaperMesh'
 import GlassMesh     from './GlassMesh'
+import TreeScene     from './TreeScene'
 import ResumeContent from './ResumeContent'
 import { useResumeTexture } from '@/hooks/useResumeTexture'
 import { useMouseParallax } from '@/hooks/useMouseParallax'
@@ -91,7 +92,7 @@ export default function ThreeScene() {
             fov     : 45,
             position: [2.5, 4, 5.5],
             near    : 0.1,
-            far     : 100,
+            far     : 300,
           }}
           gl={{
             antialias           : true,
@@ -112,6 +113,9 @@ export default function ThreeScene() {
 
           <Suspense fallback={null}>
             <Environment preset="apartment" background={false} />
+            {/* Low-poly tree backdrop — rendered first, no shadows */}
+            <TreeScene />
+
             <SceneLights />
 
             {/* Orbit controls — only active in idle mode so reading scroll still works */}
