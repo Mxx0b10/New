@@ -9,9 +9,12 @@ import SceneLights   from './SceneLights'
 import PaperMesh     from './PaperMesh'
 import GlassMesh     from './GlassMesh'
 import TreeScene     from './TreeScene'
+import Butterflies   from './Butterflies'
+import SunRays       from './SunRays'
 import ResumeContent from './ResumeContent'
-import { useResumeTexture } from '@/hooks/useResumeTexture'
-import { useMouseParallax } from '@/hooks/useMouseParallax'
+import { useResumeTexture  } from '@/hooks/useResumeTexture'
+import { useMouseParallax  } from '@/hooks/useMouseParallax'
+import { useAmbientSound   } from '@/hooks/useAmbientSound'
 
 // ── Warm desk surface ──────────────────────────────────────────────────────
 function Desk() {
@@ -52,6 +55,7 @@ export default function ThreeScene() {
 
   const [mode,          setMode         ] = useState<'idle' | 'reading'>('idle')
   const [canvasVisible, setCanvasVisible ] = useState(false)
+  const { muted, toggleMute } = useAmbientSound()
 
   // Fade in once texture is ready
   useEffect(() => {
@@ -117,6 +121,8 @@ export default function ThreeScene() {
             <TreeScene />
 
             <SceneLights />
+            <SunRays />
+            <Butterflies />
 
             {/* Orbit controls — only active in idle mode so reading scroll still works */}
             <OrbitControls
@@ -151,6 +157,37 @@ export default function ThreeScene() {
         pointerEvents: 'none',
         zIndex       : 10,
       }} />
+
+      {/* ── Mute button — always visible ── */}
+      {canvasVisible && (
+        <button
+          onClick={toggleMute}
+          title={muted ? 'Unmute sounds' : 'Mute sounds'}
+          style={{
+            position     : 'fixed',
+            top          : '20px',
+            right        : mode === 'reading' ? 'auto' : '20px',
+            left         : mode === 'reading' ? '130px' : 'auto',
+            zIndex       : 25,
+            cursor       : 'pointer',
+            display      : 'flex',
+            alignItems   : 'center',
+            justifyContent: 'center',
+            width        : '38px',
+            height       : '38px',
+            background   : 'rgba(255,255,255,0.13)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            border       : '1px solid rgba(255,255,255,0.22)',
+            borderRadius : '50%',
+            color        : 'rgba(255,255,255,0.85)',
+            fontSize     : '16px',
+            transition   : 'background 0.2s',
+          }}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+      )}
 
       {/* ── Idle hint ── */}
       {canvasVisible && mode === 'idle' && (
