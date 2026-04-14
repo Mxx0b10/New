@@ -65,9 +65,9 @@ const ResumeContent = forwardRef<HTMLDivElement>((_, ref) => {
             +91 880 081 6674 · manish10thfeh@gmail.com
           </div>
           <div style={{ fontSize: '11px', color: '#000000', letterSpacing: '0.04em' }}>
-            <span style={{ color: '#1144aa' }}>linkedin.com/in/manishpatel</span>
+            <span style={{ color: '#1144aa' }}>linkedin.com/in/manish-patel-8905b7311</span>
             {'  ·  '}
-            <span style={{ color: '#1144aa' }}>manishpatel.design</span>
+            <span style={{ color: '#1144aa' }}>manishpatel.framer.website</span>
           </div>
         </div>
 

@@ -268,7 +268,11 @@ export default function PaperMesh({
         enough resolution for displacementMap at 0.002 scale to produce
         a visible (but subtle) surface relief.
       */}
-      <boxGeometry args={[PW, PH, 0.012, 40, 70, 1]} />
+      {/*
+        8×12 segments is plenty for displacementScale=0.002 (2 mm of relief).
+        Dropping from 40×70 cuts vertex count from ~5600 to ~216 — big perf win.
+      */}
+      <boxGeometry args={[PW, PH, 0.012, 8, 12, 1]} />
     </mesh>
   )
 }
