@@ -7,11 +7,11 @@ const GA_ID = 'G-QZ595QWJL3'
 export const metadata: Metadata = {
   title       : 'Manish Patel — UX Designer',
   description : 'Interactive 3D resume of Manish Patel, UX/UI Designer based in New Delhi.',
-  metadataBase: new URL('https://manishpatel.framer.website'),
+  metadataBase: new URL('https://manishresume.vercel.app'),
   openGraph: {
     title      : 'Manish Patel — UX Designer',
     description: 'Interactive 3D resume — click the paper to read it.',
-    url        : 'https://manishpatel.framer.website',
+    url        : 'https://manishresume.vercel.app',
     siteName   : 'Manish Patel',
     images: [
       {
