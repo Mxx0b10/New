@@ -5,12 +5,12 @@ import './globals.css'
 const GA_ID = 'G-QZ595QWJL3'
 
 export const metadata: Metadata = {
-  title       : 'Manish Patel — UX Designer',
-  description : 'Interactive 3D resume of Manish Patel, UX/UI Designer based in New Delhi.',
+  title       : 'Manish Patel — UX/UI Designer | Interactive 3D Resume',
+  description : 'Manish Patel is a UX/UI Designer with 1.6+ years of agency experience in edtech & SaaS. Explore his interactive 3D resume — click the paper to read it.',
   metadataBase: new URL('https://manishresume.vercel.app'),
   openGraph: {
-    title      : 'Manish Patel — UX Designer',
-    description: 'Interactive 3D resume — click the paper to read it.',
+    title      : 'Manish Patel — UX/UI Designer | Interactive 3D Resume',
+    description: 'Manish Patel is a UX/UI Designer with 1.6+ years of agency experience in edtech & SaaS. Explore his interactive 3D resume — click the paper to read it.',
     url        : 'https://manishresume.vercel.app',
     siteName   : 'Manish Patel',
     images: [
@@ -26,8 +26,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card       : 'summary_large_image',
-    title      : 'Manish Patel — UX Designer',
-    description: 'Interactive 3D resume — click the paper to read it.',
+    title      : 'Manish Patel — UX/UI Designer | Interactive 3D Resume',
+    description: 'Manish Patel is a UX/UI Designer with 1.6+ years of agency experience in edtech & SaaS. Explore his interactive 3D resume — click the paper to read it.',
     images     : ['/preview.png'],
   },
   icons: {
