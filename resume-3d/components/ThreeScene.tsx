@@ -56,7 +56,16 @@ export default function ThreeScene() {
 
   const [mode,          setMode         ] = useState<'idle' | 'reading'>('idle')
   const [canvasVisible, setCanvasVisible ] = useState(false)
-  const { muted, toggleMute, volume, setVolume } = useAmbientSound()
+  const [isMobile,      setIsMobile     ] = useState(false)
+  const { muted, toggleMute, volume, setVolume, playPaperRustle } = useAmbientSound()
+
+  // Reactive mobile detection
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // Fade in once texture is ready
   useEffect(() => {
@@ -74,8 +83,6 @@ export default function ThreeScene() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
 
   return (
     <div style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh' }}>
@@ -145,6 +152,7 @@ export default function ThreeScene() {
               mouseRef={mouseRef}
               isMobile={isMobile}
               onModeChange={setMode}
+              onPaperSound={playPaperRustle}
             />
             <GlassMesh />
             <Desk />
@@ -321,7 +329,7 @@ export default function ThreeScene() {
             pointerEvents: 'none',
             zIndex       : 20,
           }}>
-            Scroll to read · ESC to close
+            {isMobile ? 'Tap outside to close' : 'Scroll to read · ESC to close'}
           </div>
         </>
       )}

@@ -178,5 +178,46 @@ export function useAmbientSound() {
     }
   }, [muted])
 
-  return { muted, toggleMute, volume, setVolume, started }
+  // ── Paper rustle sound ─────────────────────────────────────────────────
+  const playPaperRustle = useCallback((type: 'pickup' | 'putdown' = 'pickup') => {
+    const ctx    = ctxRef.current
+    const master = masterRef.current
+    if (!ctx || !master) return
+
+    const dur  = type === 'pickup' ? 0.22 : 0.14
+    const freq = type === 'pickup' ? 3200  : 2600
+
+    const bufSize = Math.floor(ctx.sampleRate * dur)
+    const buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate)
+    const data    = buf.getChannelData(0)
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1
+
+    const src  = ctx.createBufferSource()
+    src.buffer = buf
+
+    // High-pass + band-pass gives that crisp paper character
+    const hp  = ctx.createBiquadFilter()
+    hp.type   = 'highpass'
+    hp.frequency.value = 1200
+
+    const bp  = ctx.createBiquadFilter()
+    bp.type   = 'bandpass'
+    bp.frequency.value = freq
+    bp.Q.value = 1.4
+
+    const gain = ctx.createGain()
+    const now  = ctx.currentTime
+    gain.gain.setValueAtTime(0, now)
+    gain.gain.linearRampToValueAtTime(volumeRef.current * 0.55, now + 0.007)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + dur)
+
+    src.connect(hp)
+    hp.connect(bp)
+    bp.connect(gain)
+    gain.connect(master)
+    src.start(now)
+    src.stop(now + dur + 0.05)
+  }, [])
+
+  return { muted, toggleMute, volume, setVolume, playPaperRustle, started }
 }
