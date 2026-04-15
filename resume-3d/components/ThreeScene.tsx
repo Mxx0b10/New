@@ -5,8 +5,9 @@ import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 
-import WebGLErrorBoundary from './WebGLErrorBoundary'
-import SceneLights   from './SceneLights'
+import WebGLErrorBoundary    from './WebGLErrorBoundary'
+import MobileResumeOverlay  from './MobileResumeOverlay'
+import SceneLights           from './SceneLights'
 import PaperMesh     from './PaperMesh'
 import GlassMesh     from './GlassMesh'
 import TreeScene     from './TreeScene'
@@ -353,6 +354,14 @@ export default function ThreeScene() {
       }}>
         Loading…
       </div>
+
+      {/* ── Mobile full-screen resume sheet ── */}
+      <MobileResumeOverlay
+        visible={isMobile && mode === 'reading'}
+        onClose={() =>
+          (window as Window & { __resumePutDown?: () => void }).__resumePutDown?.()
+        }
+      />
 
       <style>{`
         @keyframes hintFadeIn {

@@ -170,13 +170,16 @@ export default function PaperMesh({
 
     const tl = gsap.timeline({
       onComplete() {
-        // Sync scrollNow to where the camera actually landed so the
-        // transition to reading mode is a smooth scroll — not a snap.
-        s.scrollNow    = camera.position.y
-        s.scrollTarget = readTop          // scroll up to header smoothly
-        s.isFlipped    = true
-        s.isAnimating  = false
-        s.inReading    = true
+        s.isFlipped   = true
+        s.isAnimating = false
+
+        if (!isMobile) {
+          // Sync scrollNow to where the camera landed so reading mode
+          // starts with a smooth scroll-to-top rather than a snap
+          s.scrollNow    = camera.position.y
+          s.scrollTarget = readTop
+          s.inReading    = true
+        }
         onModeChange('reading')
       },
     })
@@ -190,24 +193,22 @@ export default function PaperMesh({
     .to(mesh.position, { y: FLIP_Y, duration: 0.42, ease: 'power2.out' }, '-=0.48')
     // Phase 4 — rotate to face camera (spring overshoot)
     .to(mesh.rotation, { x: 0, y: 0, z: 0, duration: 0.78, ease: 'back.out(1.3)' }, '-=0.22')
-    // Phase 5 — camera slides in; on mobile also widen FOV
-    .to(camera.position, {
-      x: 0, y: FLIP_Y, z: readZ,
-      duration: 0.92, ease: 'power3.inOut',
-      onUpdate() { camera.lookAt(0, camera.position.y, 0) },
-    }, '-=0.54')
 
-    if (isMobile) {
-      tl.to(pcam, {
-        fov: MOB_FOV,
+    if (!isMobile) {
+      // Phase 5 (desktop only) — camera slides in to read
+      tl.to(camera.position, {
+        x: 0, y: FLIP_Y, z: readZ,
         duration: 0.92, ease: 'power3.inOut',
-        onUpdate() { pcam.updateProjectionMatrix() },
-      }, '<')                               // run parallel with camera move
+        onUpdate() { camera.lookAt(0, camera.position.y, 0) },
+      }, '-=0.54')
+      // Phase 6 — subtle scale breathe
+      tl.to(mesh.scale, { x: 1.03, y: 1.03, z: 1.03, duration: 0.14 }, '-=0.48')
+        .to(mesh.scale, { x: 1, y: 1, z: 1, duration: 0.32, ease: 'power1.inOut' })
+    } else {
+      // Mobile: just a quick scale breathe, then overlay takes over
+      tl.to(mesh.scale, { x: 1.05, y: 1.05, z: 1.05, duration: 0.18 }, '-=0.10')
+        .to(mesh.scale, { x: 1, y: 1, z: 1, duration: 0.28, ease: 'power1.inOut' })
     }
-
-    // Phase 6 — subtle scale breathe
-    tl.to(mesh.scale, { x: 1.03, y: 1.03, z: 1.03, duration: 0.14 }, '-=0.48')
-      .to(mesh.scale, { x: 1, y: 1, z: 1, duration: 0.32, ease: 'power1.inOut' })
   }, [camera, pcam, scene, isMobile, onModeChange, onPaperSound])
 
   // ── Put down ──────────────────────────────────────────────────────────────
@@ -217,7 +218,7 @@ export default function PaperMesh({
     if (!s.isFlipped || s.isAnimating || !mesh) return
 
     s.isAnimating = true
-    s.inReading   = false
+    s.inReading   = false   // desktop scroll stops
 
     onPaperSound('putdown')
 
@@ -241,20 +242,13 @@ export default function PaperMesh({
     .to(s, { curlProgress: 0, duration: 0.40, ease: 'power2.out' }, '-=0.35')
     // Drop to desk
     .to(mesh.position, { y: 0, duration: 0.46, ease: 'power2.in' }, '-=0.32')
-    // Camera returns
-    .to(camera.position, {
-      x: s.savedCam.x, y: s.savedCam.y, z: s.savedCam.z,
-      duration: 0.84, ease: 'power2.inOut',
-      onUpdate() { camera.lookAt(0, 0, 0) },
-    }, '-=0.40')
-
-    // Restore FOV on mobile
-    if (isMobile) {
-      tl.to(pcam, {
-        fov: DESK_FOV,
+    if (!isMobile) {
+      // Camera returns to saved position (desktop only — mobile never moved)
+      tl.to(camera.position, {
+        x: s.savedCam.x, y: s.savedCam.y, z: s.savedCam.z,
         duration: 0.84, ease: 'power2.inOut',
-        onUpdate() { pcam.updateProjectionMatrix() },
-      }, '<')
+        onUpdate() { camera.lookAt(0, 0, 0) },
+      }, '-=0.40')
     }
   }, [camera, pcam, scene, isMobile, onModeChange, onPaperSound])
 
