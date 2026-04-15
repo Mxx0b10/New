@@ -5,6 +5,7 @@ import { Canvas } from '@react-three/fiber'
 import { Environment, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 
+import WebGLErrorBoundary from './WebGLErrorBoundary'
 import SceneLights   from './SceneLights'
 import PaperMesh     from './PaperMesh'
 import GlassMesh     from './GlassMesh'
@@ -88,6 +89,7 @@ export default function ThreeScene() {
         opacity   : canvasVisible ? 1 : 0,
         transition: 'opacity 1.2s ease',
       }}>
+        <WebGLErrorBoundary>
         <Canvas
           shadows={{ type: THREE.PCFSoftShadowMap }}
           // Cap pixel ratio at 1.5 — major perf win on high-DPR screens
@@ -105,6 +107,7 @@ export default function ThreeScene() {
             toneMappingExposure : 1.05,
             outputColorSpace    : THREE.SRGBColorSpace,
             powerPreference     : 'high-performance',
+            failIfMajorPerformanceCaveat: false,  // allow software fallback
           }}
           style={{ width: '100vw', height: '100vh', display: 'block' }}
           onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
@@ -147,6 +150,7 @@ export default function ThreeScene() {
             <Desk />
           </Suspense>
         </Canvas>
+        </WebGLErrorBoundary>
       </div>
 
       {/* Cinematic vignette */}
