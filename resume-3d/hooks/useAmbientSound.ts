@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
  * Audio starts on the first user interaction (browser autoplay policy).
  */
 export function useAmbientSound() {
-  const [muted,   setMuted  ] = useState(false)
+  const [muted,   setMuted  ] = useState(true)
   const [started, setStarted] = useState(false)
   const [volume,  setVolumeSt] = useState(0.7)
   const ctxRef    = useRef<AudioContext | null>(null)
@@ -29,7 +29,7 @@ export function useAmbientSound() {
     ctxRef.current = ctx
 
     const master = ctx.createGain()
-    master.gain.value = volumeRef.current * 0.55   // scale 0–1 → 0–0.55
+    master.gain.value = 0   // start silent — user must unmute
     master.connect(ctx.destination)
     masterRef.current = master
 
