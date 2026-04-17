@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF & Screenshot to Excel Converter</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#1E3A5F"/>
+            <path d="M8 10h10M8 16h10M8 22h6" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M22 14l-4 8h8l-4-8z" fill="#4ADE80"/>
+          </svg>
+          <span>SheetAI</span>
+        </div>
+        <p class="tagline">PDF &amp; Screenshots → Perfect Excel Sheets</p>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main">
+      <!-- Upload Zone -->
+      <section class="upload-section">
+        <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Upload file">
+          <div class="drop-icon">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="32" cy="32" r="30" fill="#EBF2FA" stroke="#1E3A5F" stroke-width="2"/>
+              <path d="M32 20v16M24 28l8-8 8 8" stroke="#1E3A5F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M20 42h24" stroke="#4ADE80" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2>Drop your file here</h2>
+          <p>PDF documents, screenshots, or any image with tables</p>
+          <div class="supported-types">
+            <span class="badge">PDF</span>
+            <span class="badge">PNG</span>
+            <span class="badge">JPG</span>
+            <span class="badge">WEBP</span>
+            <span class="badge">JPEG</span>
+          </div>
+          <label class="btn-primary upload-btn" for="fileInput">
+            Choose File
+            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tiff,.tif" hidden />
+          </label>
+          <p class="size-note">Max file size: 20MB</p>
+        </div>
+
+        <!-- Selected File Preview -->
+        <div id="filePreview" class="file-preview hidden">
+          <div class="file-info">
+            <div class="file-icon" id="fileIcon">📄</div>
+            <div class="file-meta">
+              <span id="fileName" class="file-name"></span>
+              <span id="fileSize" class="file-size"></span>
+            </div>
+            <button id="clearBtn" class="clear-btn" aria-label="Remove file">✕</button>
+          </div>
+          <button id="convertBtn" class="btn-convert">
+            <span class="btn-text">Convert to Excel</span>
+            <svg class="btn-arrow" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Progress -->
+      <div id="progressSection" class="progress-section hidden">
+        <div class="progress-card">
+          <div class="spinner"></div>
+          <div class="progress-text">
+            <h3 id="progressTitle">Analyzing your file...</h3>
+            <p id="progressSub">Claude AI is extracting tabular data</p>
+          </div>
+        </div>
+        <div class="progress-bar-wrap">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div id="resultSection" class="result-section hidden">
+        <div class="result-card success">
+          <div class="result-icon">✓</div>
+          <div class="result-info">
+            <h3>Conversion Complete!</h3>
+            <p id="resultSummary"></p>
+          </div>
+        </div>
+        <div class="result-actions">
+          <a id="downloadLink" class="btn-download" download>
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/>
+            </svg>
+            Download Excel File
+          </a>
+          <button id="convertAnotherBtn" class="btn-secondary">Convert Another File</button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="errorSection" class="error-section hidden">
+        <div class="result-card error">
+          <div class="result-icon error-icon">✕</div>
+          <div class="result-info">
+            <h3>Conversion Failed</h3>
+            <p id="errorMessage"></p>
+          </div>
+        </div>
+        <button id="retryBtn" class="btn-secondary">Try Again</button>
+      </div>
+
+      <!-- Features -->
+      <section class="features">
+        <h2>How It Works</h2>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <h3>Smart Detection</h3>
+            <p>Automatically detects tables, lists, and structured data from any PDF or image.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🤖</div>
+            <h3>AI-Powered OCR</h3>
+            <p>Claude Vision AI reads even the blurriest screenshots and converts them accurately.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Styled Excel Output</h3>
+            <p>Beautiful formatted spreadsheet with headers, alternating rows, and auto-sized columns.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📋</div>
+            <h3>Multi-Sheet Support</h3>
+            <p>Multiple tables? Each gets its own sheet — nothing gets mixed up.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Powered by Claude AI · Converts PDFs &amp; screenshots to perfect Excel sheets</p>
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
