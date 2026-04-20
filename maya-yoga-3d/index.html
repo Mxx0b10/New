@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MayaYoga — 3D Scroll Experience</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Three.js fixed canvas -->
+  <div id="scene-container"></div>
+
+  <!-- Top nav -->
+  <header class="nav">
+    <div class="nav-logo">
+      <span class="logo-mark">◉</span>
+      <span class="logo-text">MayaYoga</span>
+    </div>
+    <nav class="nav-links">
+      <a href="#about">About</a>
+      <a href="#classes">Classes</a>
+      <a href="#teachers">Teachers</a>
+      <a href="#journal">Journal</a>
+      <a href="#contact" class="nav-cta">Book a class</a>
+    </nav>
+  </header>
+
+  <!-- Scroll content that drives the 3D animation -->
+  <main class="scroll-stage">
+    <!-- Section 1 — hero (tilted 3D letters) -->
+    <section class="stage hero">
+      <div class="hero-overline">∙ Breath &middot; Body &middot; Being ∙</div>
+      <div class="hero-sub">Scroll to enter the practice</div>
+      <div class="scroll-hint">
+        <span></span>
+      </div>
+    </section>
+
+    <!-- Section 2 — transition copy -->
+    <section class="stage interlude">
+      <p class="interlude-copy">
+        A sanctuary where ancient Hatha meets modern flow.<br />
+        Let each breath turn the page.
+      </p>
+    </section>
+
+    <!-- Section 3 — read mode (letters face camera) -->
+    <section class="stage read" id="about">
+      <div class="read-grid">
+        <div class="read-eyebrow">Our Philosophy</div>
+        <h2 class="read-title">Find your center, one pose at a time.</h2>
+        <p class="read-body">
+          MayaYoga is a contemporary studio rooted in traditional practice. Our
+          teachers guide students of every level through a thoughtful sequence
+          of asana, pranayama and meditation — helping you rediscover the
+          quiet, steady rhythm already living inside you.
+        </p>
+        <div class="read-meta">
+          <div>
+            <span class="meta-num">12+</span>
+            <span class="meta-label">Weekly classes</span>
+          </div>
+          <div>
+            <span class="meta-num">8</span>
+            <span class="meta-label">Certified teachers</span>
+          </div>
+          <div>
+            <span class="meta-num">2014</span>
+            <span class="meta-label">Est. in Goa</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4 — classes preview -->
+    <section class="stage classes" id="classes">
+      <h3 class="section-head">Upcoming classes</h3>
+      <ul class="class-list">
+        <li><span>06:30</span><span>Morning Vinyasa</span><span>Ananya</span></li>
+        <li><span>09:00</span><span>Restorative Yin</span><span>Isha</span></li>
+        <li><span>17:30</span><span>Ashtanga Mysore</span><span>Ravi</span></li>
+        <li><span>19:00</span><span>Sound Meditation</span><span>Leela</span></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>© MayaYoga Studio</span>
+    <span>Anjuna, Goa — India</span>
+  </footer>
+
+  <!-- three.js via importmap -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
