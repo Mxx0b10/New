@@ -1,0 +1,11 @@
+{
+  "name": "midnight-delivery",
+  "version": "0.1.0",
+  "description": "A cozy 2D pixel-art endless-runner ramen delivery game built on Phaser 3.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve@latest -l 5173 .",
+    "dev": "npx --yes serve@latest -l 5173 ."
+  }
+}
